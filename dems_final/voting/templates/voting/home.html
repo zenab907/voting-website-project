@@ -1,0 +1,150 @@
+{% extends 'voting/base.html' %}
+{% load static %}
+
+{% block title %}DEMS — Egyptian Digital Election System{% endblock %}
+
+{% block navbar_class %}{% endblock %}
+
+{% block welcome %}
+<!-- WELCOME OVERLAY -->
+<div id="welcome-overlay">
+    <div class="welcome-stars" id="stars-container"></div>
+    <div class="welcome-pyramid"></div>
+    <div class="welcome-logo">D E M S</div>
+    <div class="welcome-tagline">Digital Election Management System &middot; جمهورية مصر العربية</div>
+    <div class="welcome-message">
+        <!-- Arabic greeting stays in Nastaliq style always -->
+        <h2 style="font-family:'Amiri Quran','Cairo',serif!important;direction:rtl;">أهلاً وسهلاً بك &#127963;</h2>
+        <p>مرحباً بك في نظام الانتخابات الرقمي المصري. هنا يمكنك الإدلاء بصوتك بكل أمان وسرية. صوتك يصنع المستقبل.</p>
+    </div>
+    <div class="welcome-progress"><div class="welcome-progress-bar"></div></div>
+    <button class="welcome-enter-btn" id="enter-btn" onclick="enterSite()">Enter the System &#9419;</button>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+        <div class="hero-badge">Arab Republic of Egypt &middot; Elections</div>
+        <h1 class="hero-title">
+            <span class="hero-title-line1">Your Vote</span><br>
+            <span class="hero-accent">Your Future</span>
+        </h1>
+        <p class="hero-sub">
+            The official Egyptian digital election platform.
+            Securely authenticate with your National ID and cast your vote from anywhere in Egypt.
+        </p>
+
+        {% if election %}
+        <div class="election-status {% if election.is_open %}status-open{% else %}status-closed{% endif %}">
+            <span class="status-dot"></span>
+            {% if election.is_open %}
+                Election is <strong data-en="OPEN" data-ar="مفتوحة">OPEN</strong> &mdash; {{ election.election_name|cut:"2024" }}
+            {% else %}
+                Election is <strong data-en="CLOSED" data-ar="مغلقة">CLOSED</strong>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="hero-actions">
+            <a href="{% url 'login' %}" class="btn btn-vote">
+                <span>&#128499;</span> Login &amp; Vote
+            </a>
+            <a href="{% url 'results' %}" class="btn btn-results">
+                &#128202; View Live Results
+            </a>
+        </div>
+    </div>
+
+    <div class="hero-visual">
+        <div class="ballot-3d-scene">
+            <div class="ballot-box">
+                <div class="face face-front">&#128499;</div>
+                <div class="face face-back">&#128272;</div>
+                <div class="face face-left">&#127963;</div>
+                <div class="face face-right">&#9419;</div>
+                <div class="face face-top">&#127774;</div>
+                <div class="face face-bottom">&#128202;</div>
+            </div>
+            <div class="orbiting-card">
+                <div class="card-icon">&#128272;</div>
+                <div class="card-title">Secure Auth</div>
+                <div class="card-desc">National ID verification</div>
+            </div>
+            <div class="orbiting-card" style="--orbit:7s">
+                <div class="card-icon">&#128202;</div>
+                <div class="card-title">Live Results</div>
+                <div class="card-desc">Real-time counting</div>
+            </div>
+            <div class="orbiting-card" style="--orbit:5s">
+                <div class="card-icon">&#9989;</div>
+                <div class="card-title">One Vote</div>
+                <div class="card-desc">System enforced</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="how-it-works">
+    <div class="section-inner">
+        <h2 class="section-title">How to Vote</h2>
+        <div class="steps">
+            <div class="step reveal">
+                <div class="step-num">01</div>
+                <h3>Enter National ID</h3>
+                <p>Provide your 14-digit Egyptian National ID number</p>
+            </div>
+            <div class="step-arrow reveal" style="transition-delay:.1s">&rarr;</div>
+            <div class="step reveal" style="transition-delay:.15s">
+                <div class="step-num">02</div>
+                <h3>Verify Identity</h3>
+                <p>The system checks your registration in the national database</p>
+            </div>
+            <div class="step-arrow reveal" style="transition-delay:.25s">&rarr;</div>
+            <div class="step reveal" style="transition-delay:.3s">
+                <div class="step-num">03</div>
+                <h3>Face Biometric</h3>
+                <p>Confirm your identity with a live face scan via your camera</p>
+            </div>
+            <div class="step-arrow reveal" style="transition-delay:.4s">&rarr;</div>
+            <div class="step reveal" style="transition-delay:.45s">
+                <div class="step-num">04</div>
+                <h3>Select Candidate</h3>
+                <p>Choose your preferred candidate from your district's list</p>
+            </div>
+            <div class="step-arrow reveal" style="transition-delay:.55s">&rarr;</div>
+            <div class="step reveal" style="transition-delay:.6s">
+                <div class="step-num">05</div>
+                <h3>Cast Your Vote</h3>
+                <p>Confirm your selection to finalize your vote securely</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* Stars */
+(function(){
+    const c=document.getElementById('stars-container');
+    if(!c)return;
+    for(let i=0;i<120;i++){
+        const s=document.createElement('div');s.className='star';
+        const sz=Math.random()*2.5+.5;
+        s.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*100}%;--d:${2+Math.random()*4}s;animation-delay:${Math.random()*4}s`;
+        c.appendChild(s);
+    }
+})();
+
+/* Welcome enter/auto */
+function enterSite(){
+    const ov=document.getElementById('welcome-overlay');
+    if(!ov)return;
+    ov.classList.add('hide');
+    setTimeout(()=>{ov.style.display='none';document.getElementById('navbar').classList.add('visible');},800);
+}
+setTimeout(enterSite, 5500);
+</script>
+{% endblock %}

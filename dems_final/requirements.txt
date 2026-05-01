@@ -1,0 +1,16 @@
+# ── Core ──────────────────────────────────────────────────────────────────────
+Django==5.0
+python-dotenv==1.0.1
+Pillow==10.4.0
+
+# ── Database: Cloud / Production ─────────────────────────────────────────────
+# Uncomment for PostgreSQL (Render, Railway, Supabase, etc.)
+# psycopg2-binary==2.9.9
+# dj-database-url==2.1.0
+
+# ── Optional: OpenAI-powered chatbot ─────────────────────────────────────────
+# Uncomment to enable GPT-4o fallback in chatbot
+# openai==1.35.7
+
+# ── Gunicorn for production ───────────────────────────────────────────────────
+# gunicorn==21.2.0

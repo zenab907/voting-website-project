@@ -1,0 +1,26 @@
+{% extends 'voting/base.html' %}
+{% block navbar_class %}always-visible{% endblock %}
+
+{% block title %}DEMS — Election Closed{% endblock %}
+
+{% block content %}
+<div class="result-page">
+    <div class="result-card">
+        <div class="closed-icon">🔒</div>
+        <h1 data-en="Election Is Not Open" data-ar="الانتخابات غير مفتوحة">Election Is Not Open</h1>
+        {% if election %}
+            {% if not election.is_open %}
+            <p data-en="The election is currently not accepting votes." data-ar="الانتخابات لا تقبل الأصوات حالياً.">The election <strong>{{ election.election_name }}</strong> is currently not accepting votes.</p>
+            <p><span data-en="Opens:" data-ar="تبدأ:">Opens:</span> {{ election.start_time|date:"N j, Y — g:i A" }}</p>
+            <p><span data-en="Closes:" data-ar="تنتهي:">Closes:</span> {{ election.end_time|date:"N j, Y — g:i A" }}</p>
+            {% endif %}
+        {% else %}
+        <p data-en="No active election is configured. Please contact the election commission." data-ar="لا توجد انتخابات نشطة. يرجى التواصل مع لجنة الانتخابات.">No active election is configured. Please contact the election commission.</p>
+        {% endif %}
+        <div class="success-actions">
+            <a href="{% url 'results' %}" class="btn btn-results" data-en="View Results" data-ar="عرض النتائج">View Results</a>
+            <a href="{% url 'home' %}" class="btn btn-ghost" data-en="Home" data-ar="الرئيسية">Home</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

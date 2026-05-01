@@ -1,0 +1,671 @@
+{% extends 'voting/base.html' %}
+{% block navbar_class %}always-visible{% endblock %}
+{% load static %}
+
+{% block title %}DEMS — Voter Login{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card" id="auth-card">
+
+        <!-- ── Header ───────────────────────────────────── -->
+        <div class="auth-header">
+            <div class="auth-logo">⊛</div>
+            <h1 data-en="Voter Login" data-ar="دخول الناخب">Voter Login</h1>
+            <p data-en="Enter your National ID to access the voting system" data-ar="أدخل رقم هويتك الوطنية للوصول إلى نظام التصويت">Enter your National ID to access the voting system</p>
+        </div>
+
+        <!-- ── Step 1: National ID Input ────────────────── -->
+        <div id="step-lookup">
+            <div class="input-group">
+                <label for="national-id-input" data-en="National ID" data-ar="رقم الهوية الوطنية">National ID</label>
+                <input
+                    id="national-id-input"
+                    type="text"
+                    class="form-input nid-input-large"
+                    placeholder="Enter your 14-digit National ID"
+                    maxlength="14"
+                    pattern="[0-9]{14}"
+                    inputmode="numeric"
+                    autocomplete="off"
+                />
+                <div class="input-hint" data-en="14-digit Egyptian National ID" data-ar="رقم الهوية الوطنية المصرية (14 رقماً)">14-digit Egyptian National ID</div>
+                <div class="input-error" id="nid-error" style="display:none;"></div>
+            </div>
+
+            <!-- ── Face Biometric Section ────────────────── -->
+            <div class="face-biometric-section">
+                <div class="face-section-header">
+                    <span class="face-section-icon">🎭</span>
+                    <div>
+                        <div class="face-section-title" data-en="Face Biometric Verification" data-ar="التحقق بالوجه البيومتري">Face Biometric Verification</div>
+                        <div class="face-section-subtitle">
+                            <strong data-en="First time?" data-ar="لأول مرة؟">First time?</strong> <span data-en="Your face will be saved as your biometric identity." data-ar="سيتم حفظ وجهك كهويتك البيومترية.">Your face will be saved as your biometric identity.</span><br>
+                            <strong data-en="Returning?" data-ar="عائد؟">Returning?</strong> <span data-en="Your face will be compared to the saved record." data-ar="سيتم مقارنة وجهك بالسجل المحفوظ.">Your face will be compared to the saved record.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="face-capture-area" id="face-capture-area">
+                    <!-- Camera view -->
+                    <div class="face-video-wrapper" id="face-video-wrapper" style="display:none;">
+                        <video id="face-video" autoplay playsinline muted></video>
+                        <div class="face-overlay-ring"></div>
+                        <div class="face-guide-text" data-en="Position your face inside the circle" data-ar="ضع وجهك داخل الدائرة">Position your face inside the circle</div>
+                    </div>
+
+                    <!-- Preview after capture -->
+                    <div class="face-preview-wrapper" id="face-preview-wrapper" style="display:none;">
+                        <canvas id="face-canvas"></canvas>
+                        <div class="face-captured-badge" data-en="✓ Face Captured" data-ar="✓ تم التقاط الوجه">✓ Face Captured</div>
+                    </div>
+
+                    <!-- Initial state -->
+                    <div class="face-initial-state" id="face-initial-state">
+                        <div class="face-placeholder-icon">👤</div>
+                        <p data-en="No face biometric registered yet" data-ar="لم يتم تسجيل بيانات الوجه بعد">No face biometric registered yet</p>
+                        <button class="btn btn-face-start" id="start-camera-btn" onclick="startCamera()" data-en="📷 Start Camera" data-ar="📷 تشغيل الكاميرا">
+                            📷 Start Camera
+                        </button>
+                    </div>
+                </div>
+
+                <div class="face-actions" id="face-actions" style="display:none;">
+                    <button class="btn btn-face-capture" id="capture-btn" onclick="captureFace()" data-en="📸 Capture Face" data-ar="📸 التقاط الوجه">
+                        📸 Capture Face
+                    </button>
+                    <button class="btn btn-face-cancel" onclick="cancelCamera()" data-en="✕ Cancel" data-ar="✕ إلغاء">
+                        ✕ Cancel
+                    </button>
+                </div>
+
+                <div class="face-retake-actions" id="face-retake-actions" style="display:none;">
+                    <button class="btn btn-face-retake" onclick="retakeFace()" data-en="🔄 Retake Photo" data-ar="🔄 إعادة الالتقاط">
+                        🔄 Retake Photo
+                    </button>
+                </div>
+
+                <div class="face-status" id="face-status"></div>
+                <input type="hidden" id="face-image-data" name="face_image">
+            </div>
+
+            <button class="btn btn-verify" id="lookup-btn" onclick="lookupVoter()">
+                <span id="lookup-text" data-en="Verify Identity →" data-ar="تحقق من الهوية →">Verify Identity &nbsp;→</span>
+                <span id="lookup-spinner" style="display:none" data-en="Checking…" data-ar="جارٍ التحقق…">Checking…</span>
+            </button>
+        </div>
+
+        <!-- ── Step 2: Voter Confirmed ────────────────────── -->
+        <div id="step-confirm" style="display:none;">
+            <div class="voter-found-card">
+                <div class="voter-found-icon">✓</div>
+                <div class="voter-found-details">
+                    <div class="voter-found-label">Voter Verified</div>
+                    <div class="voter-found-name" id="confirmed-name"></div>
+                    <div class="voter-found-id" id="confirmed-nid"></div>
+                    <div class="voter-found-district" id="confirmed-district"></div>
+                </div>
+            </div>
+
+            <!-- already-voted notice -->
+            <div id="already-voted-notice" class="alert alert-warning" style="display:none;">
+                🗳️ You have already cast your vote in this election.
+            </div>
+
+            <!-- proceed button (hidden if already voted) -->
+            <form method="POST" action="{% url 'login' %}" id="proceed-form" style="display:none;">
+                {% csrf_token %}
+                <input type="hidden" name="national_id" id="hidden-nid">
+                <button type="submit" class="btn btn-verify">
+                    Proceed to Vote &nbsp;✓
+                </button>
+            </form>
+
+            <!-- view results if already voted -->
+            <div id="already-voted-actions" style="display:none;">
+                <a href="{% url 'results' %}" class="btn btn-results">View Live Results</a>
+            </div>
+
+            <button class="btn btn-ghost" onclick="resetLookup()" style="margin-top:0.75rem;width:100%;">
+                ← Use a Different ID
+            </button>
+        </div>
+
+        <div class="auth-footer">
+            <p>Secure Digital Election Management System</p>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ── Large National ID Input ── */
+.nid-input-large {
+    font-size: 2rem !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    letter-spacing: 0.25em !important;
+    text-align: center !important;
+    padding: 1.1rem 1.2rem !important;
+    height: auto !important;
+    border-width: 2px !important;
+    color: #1a1a2e !important;
+    background: #f8fafc !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+}
+.nid-input-large:focus {
+    border-color: #c9922a !important;
+    box-shadow: 0 0 0 4px rgba(201,146,42,0.12) !important;
+    background: #fff !important;
+}
+.nid-input-large::placeholder {
+    font-size: 0.9rem !important;
+    letter-spacing: 0.05em !important;
+    color: #9ca3af !important;
+    font-family: inherit !important;
+}
+
+/* ── Face Biometric Section ── */
+.face-biometric-section {
+    margin: 1.5rem 0;
+    border: 1.5px solid #e2c97e;
+    border-radius: 14px;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #fffbf0, #fff8e1);
+}
+.face-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.face-section-icon { font-size: 1.6rem; }
+.face-section-title {
+    font-weight: 700;
+    color: #1a1a2e;
+    font-size: 0.95rem;
+}
+.face-section-subtitle {
+    font-size: 0.78rem;
+    color: #6b7280;
+    margin-top: 0.1rem;
+}
+.face-capture-area {
+    background: #fff;
+    border-radius: 10px;
+    border: 1.5px dashed #d1b45a;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.9rem;
+    overflow: hidden;
+    position: relative;
+}
+.face-initial-state {
+    text-align: center;
+    padding: 1.5rem;
+    color: #9ca3af;
+}
+.face-placeholder-icon {
+    font-size: 3.5rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+.face-initial-state p {
+    font-size: 0.85rem;
+    margin-bottom: 0.9rem;
+}
+
+/* Video wrapper */
+.face-video-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 0.5rem;
+}
+#face-video {
+    width: 240px;
+    height: 240px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #c9922a;
+}
+.face-overlay-ring {
+    position: absolute;
+    width: 248px;
+    height: 248px;
+    border-radius: 50%;
+    border: 2px dashed rgba(201,146,42,0.6);
+    animation: spin 8s linear infinite;
+    pointer-events: none;
+}
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.face-guide-text {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: #c9922a;
+    font-weight: 600;
+}
+
+/* Preview wrapper */
+.face-preview-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 0.5rem;
+}
+#face-canvas {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    border: 3px solid #16a34a;
+    object-fit: cover;
+}
+.face-captured-badge {
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #16a34a;
+    background: #dcfce7;
+    padding: 0.2rem 0.7rem;
+    border-radius: 20px;
+    border: 1px solid #86efac;
+}
+
+/* Action Buttons */
+.btn-face-start {
+    background: linear-gradient(135deg, #c9922a, #e0a82e);
+    color: #fff;
+    border: none;
+    padding: 0.6rem 1.4rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-face-start:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(201,146,42,0.35); }
+.face-actions {
+    display: flex;
+    gap: 0.6rem;
+}
+.btn-face-capture {
+    flex: 1;
+    background: linear-gradient(135deg, #1a1a2e, #2d2d4e);
+    color: #fff;
+    border: none;
+    padding: 0.65rem 1rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-face-capture:hover { background: linear-gradient(135deg, #2d2d4e, #1a1a2e); }
+.btn-face-cancel {
+    background: #fff;
+    color: #6b7280;
+    border: 1.5px solid #d1d5db;
+    padding: 0.65rem 1rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-face-cancel:hover { background: #f3f4f6; }
+.btn-face-retake {
+    width: 100%;
+    background: #fff;
+    color: #c9922a;
+    border: 1.5px solid #c9922a;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-face-retake:hover { background: #fffbf0; }
+.face-retake-actions { margin-top: 0; }
+.face-status {
+    font-size: 0.8rem;
+    color: #16a34a;
+    margin-top: 0.4rem;
+    text-align: center;
+    min-height: 1.2em;
+}
+
+/* Existing styles */
+.alert { padding:0.75rem 1rem; border-radius:6px; margin-bottom:0.75rem; font-size:0.9rem; }
+.alert-error   { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+.alert-success { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+.alert-warning { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+.input-group label { display:block; margin-bottom:0.5rem; font-weight:600; color:#374151; }
+.input-error { color:#dc2626; font-size:0.85rem; margin-top:0.4rem; padding:0.4rem 0.6rem; background:#fef2f2; border-radius:4px; border-left:3px solid #dc2626; }
+.voter-found-card { display:flex; align-items:center; gap:1rem; padding:1.25rem; background:linear-gradient(135deg,#f0fdf4,#dcfce7); border:1.5px solid #86efac; border-radius:10px; margin-bottom:1.25rem; }
+.voter-found-icon { width:48px; height:48px; background:#16a34a; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0; }
+.voter-found-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#16a34a; font-weight:700; margin-bottom:0.2rem; }
+.voter-found-name { font-size:1.1rem; font-weight:700; color:#111827; }
+.voter-found-id { font-size:0.8rem; color:#6b7280; font-family:monospace; letter-spacing:0.05em; }
+.voter-found-district { font-size:0.82rem; color:#374151; margin-top:0.15rem; }
+.auth-footer { margin-top:2rem; text-align:center; font-size:0.8rem; color:#6b7280; }
+#national-id-input.shake { animation:shake 0.35s ease; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 60%{transform:translateX(8px)} 80%{transform:translateX(-4px)} }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<!-- face-api.js — runs entirely in the browser, no external API needed -->
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+const CSRF_TOKEN = '{{ csrf_token }}';
+
+// ═══════════════════════════════════════════════════════════════════
+//  FACE-API.JS STATE
+// ═══════════════════════════════════════════════════════════════════
+let stream         = null;
+let faceDescriptor = null;   // Float32Array(128) from face-api
+let modelsLoaded   = false;
+let currentNID     = null;
+
+// CDN path for face-api models (tiny + landmarks + recognition)
+const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.2/model';
+
+async function loadModels() {
+    setFaceStatus('⏳ Loading face recognition models…', '#c9922a');
+    try {
+        await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+            faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
+            faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        ]);
+        modelsLoaded = true;
+        setFaceStatus('✓ Face recognition ready — click Start Camera', '#16a34a');
+    } catch(e) {
+        setFaceStatus('⚠ Could not load models. Check internet connection.', '#dc2626');
+        console.error('face-api model load error:', e);
+    }
+}
+
+// ── Camera ──────────────────────────────────────────────────────────
+async function startCamera() {
+    if (!modelsLoaded) {
+        await loadModels();
+        if (!modelsLoaded) return;
+    }
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: 640, height: 480 }
+        });
+        const video = document.getElementById('face-video');
+        video.srcObject = stream;
+        await video.play();
+
+        document.getElementById('face-initial-state').style.display  = 'none';
+        document.getElementById('face-video-wrapper').style.display  = 'flex';
+        document.getElementById('face-actions').style.display        = 'flex';
+        setFaceStatus('📷 Position your face inside the circle, then click Capture', '#c9922a');
+    } catch (err) {
+        setFaceStatus('⚠ Camera access denied. Please allow camera permissions.', '#dc2626');
+    }
+}
+
+async function captureFace() {
+    const video  = document.getElementById('face-video');
+    const canvas = document.getElementById('face-canvas');
+    const captureBtn = document.getElementById('capture-btn');
+
+    captureBtn.disabled = true;
+    captureBtn.textContent = '🔍 Detecting face…';
+    setFaceStatus('🔍 Detecting and encoding your face…', '#c9922a');
+
+    try {
+        // Detect face + compute 128-D descriptor
+        const detection = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320 }))
+            .withFaceLandmarks(true)
+            .withFaceDescriptor();
+
+        if (!detection) {
+            setFaceStatus('⚠ No face detected. Make sure your face is clearly visible.', '#dc2626');
+            captureBtn.disabled = false;
+            captureBtn.textContent = '📸 Capture Face';
+            return;
+        }
+
+        // Store the descriptor
+        faceDescriptor = Array.from(detection.descriptor);
+
+        // Draw preview on canvas
+        const size = 220;
+        canvas.width  = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(video, 0, 0, size, size);
+        ctx.restore();
+
+        // Stop camera
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        stream = null;
+
+        document.getElementById('face-video-wrapper').style.display  = 'none';
+        document.getElementById('face-actions').style.display        = 'none';
+        document.getElementById('face-preview-wrapper').style.display = 'flex';
+        document.getElementById('face-retake-actions').style.display = 'block';
+        setFaceStatus('✓ Face detected and encoded — ready to verify!', '#16a34a');
+
+    } catch(e) {
+        setFaceStatus('⚠ Detection error: ' + e.message, '#dc2626');
+        captureBtn.disabled = false;
+        captureBtn.textContent = '📸 Capture Face';
+        console.error(e);
+    }
+}
+
+function cancelCamera() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    document.getElementById('face-video-wrapper').style.display  = 'none';
+    document.getElementById('face-actions').style.display        = 'none';
+    document.getElementById('face-initial-state').style.display  = 'block';
+    setFaceStatus('', '');
+}
+
+function retakeFace() {
+    faceDescriptor = null;
+    document.getElementById('face-preview-wrapper').style.display  = 'none';
+    document.getElementById('face-retake-actions').style.display   = 'none';
+    document.getElementById('face-initial-state').style.display    = 'block';
+    setFaceStatus('', '');
+}
+
+function setFaceStatus(msg, color) {
+    const el = document.getElementById('face-status');
+    el.textContent  = msg;
+    el.style.color  = color || 'inherit';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  MAIN FLOW — Verify Identity (NID + Face)
+// ═══════════════════════════════════════════════════════════════════
+async function lookupVoter() {
+    const input = document.getElementById('national-id-input');
+    const nid   = input.value.trim();
+    const errEl = document.getElementById('nid-error');
+    errEl.style.display = 'none';
+
+    // 1 — Validate NID format
+    if (!/^\d{14}$/.test(nid)) {
+        showError('National ID must be exactly 14 digits.');
+        input.classList.add('shake');
+        setTimeout(() => input.classList.remove('shake'), 400);
+        return;
+    }
+
+    // 2 — Face descriptor required
+    if (!faceDescriptor) {
+        showError('Please capture your face biometric before verifying.');
+        document.getElementById('face-capture-area').scrollIntoView({ behavior: 'smooth' });
+        setFaceStatus('⚠ Face capture required!', '#dc2626');
+        return;
+    }
+
+    currentNID = nid;
+    setBtnLoading(true);
+
+    try {
+        // 3 — Send NID + descriptor to backend
+        const res  = await fetch('/api/face/check/', {
+            method:  'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify({ national_id: nid, descriptor: faceDescriptor }),
+        });
+        const data = await res.json();
+
+        // 4 — Handle face result
+        if (!data.success) {
+            if (data.status === 'mismatch') {
+                // Face doesn't match stored record
+                showFaceResult('mismatch', data.message_en || data.message);
+            } else {
+                // Voter not found or other error
+                showError(data.error || 'Verification failed.');
+            }
+            setBtnLoading(false);
+            return;
+        }
+
+        if (data.status === 'registered') {
+            // First time — face saved, now login
+            showFaceResult('registered', data.message_en || data.message);
+            await delay(1200);
+            await doApiLogin(nid);
+        } else if (data.status === 'verified') {
+            // Returning voter — face matches
+            showFaceResult('verified', data.message_en || data.message);
+            await delay(900);
+            await doApiLogin(nid);
+        }
+
+    } catch (e) {
+        showError('Network error. Please try again.');
+        setBtnLoading(false);
+    }
+}
+
+async function doApiLogin(nid) {
+    try {
+        const res  = await fetch('/api/login/', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ national_id: nid }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            showVoterConfirmed(data.voter, nid);
+        } else {
+            showError(data.error || 'User not found in registry.');
+        }
+    } catch(e) {
+        showError('Network error during login.');
+    }
+    setBtnLoading(false);
+}
+
+// ── Face result banner ───────────────────────────────────────────────
+function showFaceResult(status, msg) {
+    // Remove old banner
+    const old = document.getElementById('face-result-banner');
+    if (old) old.remove();
+
+    const colors = {
+        registered: { bg: '#dcfce7', border: '#86efac', color: '#166534', icon: '🎉' },
+        verified:   { bg: '#dbeafe', border: '#93c5fd', color: '#1e40af', icon: '✅' },
+        mismatch:   { bg: '#fee2e2', border: '#fca5a5', color: '#991b1b', icon: '❌' },
+    };
+    const c = colors[status] || colors.mismatch;
+
+    const banner = document.createElement('div');
+    banner.id = 'face-result-banner';
+    banner.style.cssText = `
+        padding:14px 16px; border-radius:10px; margin-bottom:16px;
+        background:${c.bg}; border:1.5px solid ${c.border}; color:${c.color};
+        font-weight:600; font-size:0.95rem; display:flex; align-items:center; gap:10px;
+        animation: fadeSlideUp .3s ease;
+    `;
+    banner.innerHTML = `<span style="font-size:1.3rem">${c.icon}</span><span>${msg}</span>`;
+    document.getElementById('step-lookup').prepend(banner);
+}
+
+// ── Voter confirmed card ─────────────────────────────────────────────
+function showVoterConfirmed(voter, nid) {
+    document.getElementById('confirmed-name').textContent     = voter.full_name;
+    document.getElementById('confirmed-nid').textContent      = nid;
+    document.getElementById('confirmed-district').textContent = voter.district ? '📍 ' + voter.district : '';
+    document.getElementById('step-lookup').style.display  = 'none';
+    document.getElementById('step-confirm').style.display = 'block';
+
+    if (voter.has_voted) {
+        document.getElementById('already-voted-notice').style.display  = 'block';
+        document.getElementById('already-voted-actions').style.display = 'block';
+        document.getElementById('proceed-form').style.display          = 'none';
+    } else {
+        document.getElementById('hidden-nid').value                    = nid;
+        document.getElementById('proceed-form').style.display          = 'block';
+        document.getElementById('already-voted-notice').style.display  = 'none';
+        document.getElementById('already-voted-actions').style.display = 'none';
+    }
+}
+
+function resetLookup() {
+    document.getElementById('step-confirm').style.display = 'none';
+    document.getElementById('step-lookup').style.display  = 'block';
+    document.getElementById('national-id-input').value    = '';
+    document.getElementById('nid-error').style.display    = 'none';
+    faceDescriptor = null;
+    retakeFace();
+    setBtnLoading(false);
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+function showError(msg) {
+    const errEl = document.getElementById('nid-error');
+    errEl.textContent   = msg;
+    errEl.style.display = 'block';
+}
+
+function setBtnLoading(loading) {
+    document.getElementById('lookup-text').style.display    = loading ? 'none'   : 'inline';
+    document.getElementById('lookup-spinner').style.display = loading ? 'inline' : 'none';
+    document.getElementById('lookup-btn').disabled          = loading;
+}
+
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+// ── Init ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    // Auto-load models in background
+    loadModels();
+
+    document.getElementById('national-id-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') lookupVoter();
+    });
+    document.getElementById('national-id-input').addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '').slice(0, 14);
+    });
+});
+</script>
+<script src="{% static 'voting/js/face_recognition.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'voting/base.html' %}
+{% block navbar_class %}always-visible{% endblock %}
+
+{% block title %}DEMS — Already Voted{% endblock %}
+
+{% block content %}
+<div class="result-page">
+    <div class="result-card">
+        <div class="already-icon">🗳️</div>
+        <h1 data-en="You Have Already Voted" data-ar="لقد صوّتَ مسبقاً">You Have Already Voted</h1>
+        {% if voter %}
+        <p>{{ voter.full_name }}</p>
+        {% else %}
+        <p data-en="A vote has already been cast for this National ID." data-ar="تم الإدلاء بصوت لرقم الهوية هذا مسبقاً.">A vote has already been cast for this National ID.</p>
+        {% endif %}
+        <p class="already-sub" data-en="Each registered voter may only vote once. Your vote is permanent and secure." data-ar="يحق لكل ناخب مسجّل التصويت مرة واحدة فقط. صوتك دائم وآمن.">Each registered voter may only vote once. Your vote is permanent and secure.</p>
+        <div class="success-actions">
+            <a href="{% url 'results' %}" class="btn btn-results" data-en="View Live Results" data-ar="النتائج المباشرة">View Live Results</a>
+            <a href="{% url 'logout' %}" class="btn btn-ghost" data-en="Logout" data-ar="خروج">Logout</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

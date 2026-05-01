@@ -1,0 +1,60 @@
+{% extends 'voting/base.html' %}
+{% block navbar_class %}always-visible{% endblock %}
+{% load static %}
+
+{% block title %}DEMS — Live Election Results{% endblock %}
+
+{% block content %}
+<div class="results-page">
+    <div class="results-header">
+        <h1 data-en="Live Election Results" data-ar="نتائج الانتخابات المباشرة">Live Election Results</h1>
+        <div class="results-meta">
+            <div class="meta-stat">
+                <span class="meta-num">{{ total_votes }}</span>
+                <span class="meta-label" data-en="Total Votes Cast" data-ar="إجمالي الأصوات">Total Votes Cast</span>
+            </div>
+            <div class="meta-stat">
+                <span class="meta-num">{{ turnout }}%</span>
+                <span class="meta-label" data-en="Voter Turnout" data-ar="نسبة المشاركة">Voter Turnout</span>
+            </div>
+        </div>
+    </div>
+
+    {% for district in districts %}
+    <div class="results-district">
+        <div class="district-header">
+            <h2>{{ district.name }}</h2>
+            {% if district.name_arabic %}<span class="district-ar">{{ district.name_arabic }}</span>{% endif %}
+        </div>
+
+        <div class="results-candidates">
+            {% for candidate in district.candidates.all %}
+            {% if candidate.is_active %}
+            <div class="result-row">
+                <div class="result-candidate-info">
+                    <span class="result-name">{{ candidate.full_name }}</span>
+                    <span class="result-party party-{{ candidate.party }}">{{ candidate.get_party_display }}</span>
+                </div>
+                <div class="result-bar-wrap">
+                    {% with district_total=district.votes.count %}
+                    {% if district_total > 0 %}
+                        {% widthratio candidate.vote_count district_total 100 as pct %}
+                    {% else %}
+                        {% with pct=0 %}{% endwith %}
+                    {% endif %}
+                    <div class="result-bar">
+                        <div class="result-fill" style="width: {% if district_total > 0 %}{% widthratio candidate.vote_count district_total 100 %}{% else %}0{% endif %}%"></div>
+                    </div>
+                    <span class="result-votes">{{ candidate.vote_count }} <span data-en="votes" data-ar="صوت">votes</span></span>
+                    {% endwith %}
+                </div>
+            </div>
+            {% endif %}
+            {% empty %}
+            <p class="no-data" data-en="No candidates registered for this district." data-ar="لا يوجد مرشحون مسجلون لهذه الدائرة.">No candidates registered for this district.</p>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

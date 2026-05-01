@@ -1,0 +1,312 @@
+{% extends 'voting/base.html' %}
+{% block navbar_class %}always-visible{% endblock %}
+{% load static %}
+
+{% block title %}DEMS — Admin Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+.dash-wrap{padding:6rem 2rem 4rem;max-width:1280px;margin:0 auto}
+.dash-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:2.5rem;border-bottom:1px solid rgba(201,146,42,.25);padding-bottom:1.5rem;flex-wrap:wrap;gap:1rem}
+.dash-title{font-family:var(--font-display);font-size:clamp(1.6rem,3vw,2.4rem);font-weight:900;color:var(--gold);letter-spacing:.04em}
+.dash-title small{display:block;font-family:var(--font-mono);font-size:.75rem;font-weight:400;color:var(--gray-400);letter-spacing:.12em;margin-top:.2rem}
+.dash-meta{font-family:var(--font-mono);font-size:.78rem;color:var(--gray-400);text-align:right}
+.dash-meta strong{color:var(--gold-light)}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2.5rem}
+.kpi-card{background:var(--navy-mid);border:1px solid rgba(201,146,42,.2);border-radius:var(--radius-lg);padding:1.4rem 1.5rem;position:relative;overflow:hidden;transition:border-color var(--transition),transform var(--transition)}
+.kpi-card:hover{border-color:rgba(201,146,42,.5);transform:translateY(-3px)}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--gold-light));border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.kpi-card.accent-green::before{background:linear-gradient(90deg,#2a7a4b,#4caf81)}
+.kpi-card.accent-blue::before{background:linear-gradient(90deg,#1a56a0,#3a80d8)}
+.kpi-card.accent-red::before{background:linear-gradient(90deg,#c0392b,#e05555)}
+.kpi-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:1rem;background:rgba(201,146,42,.12)}
+.kpi-card.accent-green .kpi-icon{background:rgba(42,122,75,.15)}
+.kpi-card.accent-blue .kpi-icon{background:rgba(26,86,160,.15)}
+.kpi-card.accent-red .kpi-icon{background:rgba(192,57,43,.15)}
+.kpi-num{font-family:var(--font-display);font-size:clamp(2rem,4vw,2.6rem);font-weight:900;color:var(--white);line-height:1;margin-bottom:.4rem}
+.kpi-label{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.12em;color:var(--gray-400);text-transform:uppercase}
+.kpi-sub{margin-top:.5rem;font-size:.82rem;color:var(--gray-400)}
+.turnout-bar-wrap{margin-bottom:2.5rem;background:var(--navy-mid);border:1px solid rgba(201,146,42,.2);border-radius:var(--radius-lg);padding:1.5rem 2rem}
+.turnout-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.turnout-title{font-family:var(--font-mono);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gray-400)}
+.turnout-pct{font-family:var(--font-display);font-size:1.5rem;font-weight:700;color:var(--gold)}
+.turnout-bar-bg{height:10px;background:rgba(255,255,255,.07);border-radius:5px;overflow:hidden}
+.turnout-bar-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--gold),var(--gold-light));width:0%;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2.5rem}
+@media(max-width:768px){.charts-row{grid-template-columns:1fr}}
+.chart-card{background:var(--navy-mid);border:1px solid rgba(201,146,42,.2);border-radius:var(--radius-lg);padding:1.5rem}
+.chart-card-title{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1.2rem;display:flex;align-items:center;gap:.5rem}
+.chart-card-title::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.district-section{background:var(--navy-mid);border:1px solid rgba(201,146,42,.2);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:2.5rem}
+.district-section-header{padding:1.2rem 1.5rem;border-bottom:1px solid rgba(201,146,42,.15);display:flex;align-items:center;justify-content:space-between}
+.section-title{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-pale);display:flex;align-items:center;gap:.5rem}
+.section-title::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.dash-table{width:100%;border-collapse:collapse;font-size:.9rem}
+.dash-table th{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray-400);padding:.8rem 1.5rem;text-align:left;border-bottom:1px solid rgba(201,146,42,.12)}
+.dash-table td{padding:.9rem 1.5rem;border-bottom:1px solid rgba(255,255,255,.04);color:var(--white);vertical-align:middle}
+.dash-table tr:last-child td{border-bottom:none}
+.dash-table tr:hover td{background:rgba(201,146,42,.04)}
+.district-arabic{display:block;font-size:.75rem;color:var(--gray-400);font-family:var(--font-body);margin-top:.1rem}
+.mini-bar-wrap{display:flex;align-items:center;gap:.7rem}
+.mini-bar-bg{flex:1;height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;max-width:120px}
+.mini-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold),var(--gold-light))}
+.mini-bar-pct{font-family:var(--font-mono);font-size:.78rem;color:var(--gold-light);min-width:36px}
+.badge{display:inline-block;padding:.2rem .55rem;border-radius:4px;font-size:.72rem;font-family:var(--font-mono);letter-spacing:.06em}
+.badge-votes{background:rgba(201,146,42,.12);color:var(--gold-light);border:1px solid rgba(201,146,42,.2)}
+.actions-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:2.5rem}
+.action-card{background:var(--navy-mid);border:1px solid rgba(201,146,42,.15);border-radius:var(--radius-lg);padding:1.2rem 1.3rem;text-decoration:none;transition:all var(--transition);display:flex;flex-direction:column;gap:.4rem}
+.action-card:hover{border-color:var(--gold);background:rgba(201,146,42,.06);transform:translateY(-2px);color:var(--white)}
+.action-icon{font-size:20px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:rgba(201,146,42,.1);border-radius:8px;margin-bottom:.3rem}
+.action-title{font-weight:600;font-size:.9rem;color:var(--white)}
+.action-desc{font-size:.75rem;color:var(--gray-400)}
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#2a7a4b;margin-right:.4rem;animation:pulse-dot 1.5s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-wrap">
+
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">
+        Election Dashboard
+        <small>DEMS — Digital Election Management System</small>
+      </h1>
+    </div>
+    <div class="dash-meta">
+      Admin: <strong>{{ request.user.username }}</strong><br>
+      <span id="live-clock"></span>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon">👥</div>
+      <div class="kpi-num">{{ total_voters }}</div>
+      <div class="kpi-label">Registered Voters</div>
+      <div class="kpi-sub">Active voter registry</div>
+    </div>
+    <div class="kpi-card accent-green">
+      <div class="kpi-icon">✓</div>
+      <div class="kpi-num">{{ voted_count }}</div>
+      <div class="kpi-label">Votes Cast</div>
+      <div class="kpi-sub">Ballots recorded</div>
+    </div>
+    <div class="kpi-card accent-blue">
+      <div class="kpi-icon">📊</div>
+      <div class="kpi-num">{% if total_voters > 0 %}{% widthratio voted_count total_voters 100 %}%{% else %}0%{% endif %}</div>
+      <div class="kpi-label">Voter Turnout</div>
+      <div class="kpi-sub">Participation rate</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">🗺️</div>
+      <div class="kpi-num">{{ districts.count }}</div>
+      <div class="kpi-label">Districts</div>
+      <div class="kpi-sub">Electoral zones</div>
+    </div>
+    <div class="kpi-card accent-red">
+      <div class="kpi-icon">⏳</div>
+      <div class="kpi-num">{{ total_voters|add:"-"|add:voted_count }}</div>
+      <div class="kpi-label">Pending Votes</div>
+      <div class="kpi-sub">Yet to cast ballots</div>
+    </div>
+  </div>
+
+  <div class="turnout-bar-wrap">
+    <div class="turnout-header">
+      <span class="turnout-title">Overall Voter Turnout</span>
+      <span class="turnout-pct">{% if total_voters > 0 %}{% widthratio voted_count total_voters 100 %}%{% else %}0%{% endif %}</span>
+    </div>
+    <div class="turnout-bar-bg">
+      <div class="turnout-bar-fill" id="turnout-fill"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:.6rem;font-family:var(--font-mono);font-size:.7rem;color:var(--gray-400);">
+      <span>{{ voted_count }} voted</span>
+      <span>{{ total_voters }} total</span>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-card-title">Votes by District</div>
+      <div style="position:relative;height:260px;">
+        <canvas id="districtChart" role="img" aria-label="Votes per district bar chart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Turnout by District (%)</div>
+      <div id="turnout-chart-wrap" style="position:relative;height:260px;">
+        <canvas id="turnoutChart" role="img" aria-label="Turnout percentage per district"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-bottom:1rem;">Quick Actions</div>
+  <div class="actions-grid">
+    <a href="{% url 'admin_voters' %}" class="action-card">
+      <div class="action-icon">👤</div>
+      <div class="action-title">Voters</div>
+      <div class="action-desc">Manage voter registry</div>
+    </a>
+    <a href="/admin/voting/candidate/" class="action-card">
+      <div class="action-icon">🏆</div>
+      <div class="action-title">Candidates</div>
+      <div class="action-desc">Add, edit, remove</div>
+    </a>
+    <a href="/admin/voting/district/" class="action-card">
+      <div class="action-icon">🗺️</div>
+      <div class="action-title">Districts</div>
+      <div class="action-desc">Configure zones</div>
+    </a>
+    <a href="/admin/voting/electionconfig/" class="action-card">
+      <div class="action-icon">⏱️</div>
+      <div class="action-title">Election Config</div>
+      <div class="action-desc">Dates &amp; status</div>
+    </a>
+    <a href="{% url 'results' %}" class="action-card">
+      <div class="action-icon">📊</div>
+      <div class="action-title">Live Results</div>
+      <div class="action-desc">Real-time tallies</div>
+    </a>
+    <a href="/admin/" class="action-card">
+      <div class="action-icon">⚙️</div>
+      <div class="action-title">Django Admin</div>
+      <div class="action-desc">Full admin interface</div>
+    </a>
+  </div>
+
+  <div class="district-section">
+    <div class="district-section-header">
+      <span class="section-title">District Overview</span>
+      <span style="font-family:var(--font-mono);font-size:.72rem;color:var(--gray-400);">
+        <span class="live-dot"></span>LIVE
+      </span>
+    </div>
+    <table class="dash-table">
+      <thead>
+        <tr>
+          <th>District</th>
+          <th>Registered</th>
+          <th>Voted</th>
+          <th>Candidates</th>
+          <th>Turnout</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for district in districts %}
+        <tr>
+          <td>
+            <strong>{{ district.name }}</strong>
+            {% if district.name_arabic %}<span class="district-arabic">{{ district.name_arabic }}</span>{% endif %}
+          </td>
+          <td>{{ district.voters.count }}</td>
+          <td><span class="badge badge-votes">{{ district.votes.count }}</span></td>
+          <td>{{ district.candidate_count }}</td>
+          <td>
+            <div class="mini-bar-wrap">
+              <div class="mini-bar-bg">
+                <div class="mini-bar-fill" style="width:{% if district.voters.count > 0 %}{% widthratio district.votes.count district.voters.count 100 %}%{% else %}0%{% endif %}"></div>
+              </div>
+              <span class="mini-bar-pct">
+                {% if district.voters.count > 0 %}{% widthratio district.votes.count district.voters.count 100 %}%{% else %}0%{% endif %}
+              </span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+(function(){
+  function updateClock(){
+    var el=document.getElementById('live-clock');
+    if(el) el.textContent=new Date().toLocaleString('en-EG',{dateStyle:'medium',timeStyle:'short'});
+  }
+  updateClock();
+  setInterval(updateClock,60000);
+
+  var pct={% if total_voters > 0 %}{% widthratio voted_count total_voters 100 %}{% else %}0{% endif %};
+  setTimeout(function(){
+    var fill=document.getElementById('turnout-fill');
+    if(fill) fill.style.width=pct+'%';
+  },400);
+
+  var labels=[{% for d in districts %}'{{ d.name }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+  var votes=[{% for d in districts %}{{ d.votes.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  var voters=[{% for d in districts %}{{ d.voters.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  var turnout=voters.map(function(v,i){return v>0?Math.round(votes[i]/v*100):0;});
+
+  Chart.defaults.color='rgba(248,245,239,0.6)';
+  Chart.defaults.borderColor='rgba(201,146,42,0.15)';
+  Chart.defaults.font.family="'IBM Plex Mono', monospace";
+  Chart.defaults.font.size=11;
+
+  new Chart(document.getElementById('districtChart'),{
+    type:'bar',
+    data:{
+      labels:labels,
+      datasets:[{
+        label:'Votes',
+        data:votes,
+        backgroundColor:'rgba(201,146,42,0.55)',
+        borderColor:'#c9922a',
+        borderWidth:1,
+        borderRadius:4
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{backgroundColor:'#0e1e38',borderColor:'#c9922a',borderWidth:1,titleColor:'#e8b84b',bodyColor:'#f8f5ef'}
+      },
+      scales:{
+        x:{grid:{color:'rgba(201,146,42,0.07)'},ticks:{maxRotation:40,minRotation:20}},
+        y:{grid:{color:'rgba(201,146,42,0.07)'},beginAtZero:true,ticks:{stepSize:1}}
+      }
+    }
+  });
+
+  var horH=Math.max(labels.length*44+60,200);
+  document.getElementById('turnout-chart-wrap').style.height=horH+'px';
+
+  new Chart(document.getElementById('turnoutChart'),{
+    type:'bar',
+    data:{
+      labels:labels,
+      datasets:[{
+        label:'Turnout %',
+        data:turnout,
+        backgroundColor:turnout.map(function(v){
+          return v>=60?'rgba(42,122,75,0.7)':v>=30?'rgba(201,146,42,0.65)':'rgba(192,57,43,0.65)';
+        }),
+        borderColor:turnout.map(function(v){
+          return v>=60?'#2a7a4b':v>=30?'#c9922a':'#c0392b';
+        }),
+        borderWidth:1,
+        borderRadius:4
+      }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{backgroundColor:'#0e1e38',borderColor:'#c9922a',borderWidth:1,titleColor:'#e8b84b',bodyColor:'#f8f5ef',
+          callbacks:{label:function(c){return ' '+c.raw+'% turnout';}}}
+      },
+      scales:{
+        x:{max:100,grid:{color:'rgba(201,146,42,0.07)'},ticks:{callback:function(v){return v+'%';}}},
+        y:{grid:{display:false}}
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

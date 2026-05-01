@@ -1,0 +1,69 @@
+{% extends 'voting/base.html' %}
+{% block navbar_class %}always-visible{% endblock %}
+{% load static %}
+
+{% block title %}DEMS — Manage Voters{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+    <div class="admin-header">
+        <h1>Voter Registry</h1>
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-ghost">← Dashboard</a>
+    </div>
+
+    {% if messages %}
+    <div class="flash-container">
+        {% for message in messages %}
+        <div class="flash flash-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="voters-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>National ID</th>
+                    <th>District</th>
+                    <th>Voted</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for voter in voters %}
+                <tr class="{% if not voter.is_active %}row-inactive{% endif %}">
+                    <td><strong>{{ voter.full_name }}</strong></td>
+                    <td class="mono">{{ voter.national_id }}</td>
+                    <td>{{ voter.district.name|default:"—" }}</td>
+                    <td>
+                        {% if voter.has_voted %}
+                        <span class="badge badge-blue">✓ Voted</span>
+                        {% else %}
+                        <span class="badge badge-gray">Not yet</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if voter.is_active %}
+                        <span class="badge badge-green">Active</span>
+                        {% else %}
+                        <span class="badge badge-red">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="/admin/voting/voter/{{ voter.id }}/change/" class="btn-sm">Edit</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">No voters registered. Run: python manage.py seed_data</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="admin-tip">
+        <strong>💡 Tip:</strong> You can manage voter details, districts, and candidates through the Django Admin panel.
+    </div>
+</div>
+{% endblock %}

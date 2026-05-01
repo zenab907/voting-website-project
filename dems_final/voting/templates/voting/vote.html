@@ -1,0 +1,303 @@
+{% extends 'voting/base.html' %}
+{% block navbar_class %}always-visible{% endblock %}
+{% load static %}
+
+{% block title %}DEMS — Cast Your Vote{% endblock %}
+
+{% block content %}
+<div class="vote-page">
+
+    <!-- Voter Info Bar -->
+    <div class="voter-bar">
+        <div class="voter-bar-inner">
+            <div class="voter-info">
+                <span class="voter-verified" data-en="✓ Authenticated" data-ar="✓ تم التحقق">✓ Authenticated</span>
+                <span class="voter-name">{{ voter.full_name }}</span>
+                <span class="voter-id">{{ voter.national_id }}</span>
+            </div>
+            <div class="district-info">
+                <span class="district-label" data-en="Your District" data-ar="دائرتك الانتخابية">Your District</span>
+                <span class="district-name">{{ district.name }}</span>
+                {% if district.name_arabic %}
+                <span class="district-arabic">{{ district.name_arabic }}</span>
+                {% endif %}
+            </div>
+            {% if election %}
+            <div class="election-timer" id="election-timer">
+                <span class="timer-label" data-en="Election closes in" data-ar="ينتهي التصويت خلال">Election closes in</span>
+                <span class="timer-countdown" id="countdown">--:--:--</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="vote-content">
+        <div class="vote-header">
+            <h1 data-en="Select Your Candidate" data-ar="اختر مرشحك">Select Your Candidate</h1>
+            <p class="vote-instruction">
+                <span data-en="Choose one candidate from" data-ar="اختر مرشحاً واحداً من دائرة">Choose one candidate from</span>
+                <strong>{{ district.name }}</strong>
+                <span data-en="district. Your vote is final and cannot be changed." data-ar="الانتخابية. صوتك نهائي ولا يمكن تغييره.">district. Your vote is final and cannot be changed.</span>
+            </p>
+        </div>
+
+        <!-- Already Voted Banner (shown after successful vote without page reload) -->
+        <div id="voted-banner" class="voted-banner" style="display:none;">
+            <span class="voted-banner-icon">🗳️</span>
+            <div>
+                <strong data-en="You have already voted." data-ar="لقد أدليتَ بصوتك مسبقاً.">You have already voted.</strong>
+                <span id="voted-banner-candidate"></span>
+            </div>
+        </div>
+
+        <!-- Candidates Grid -->
+        {% if candidates %}
+        <div class="candidates-grid" id="candidates-grid">
+            {% for candidate in candidates %}
+            <div class="candidate-card" id="card-{{ candidate.id }}" data-id="{{ candidate.id }}">
+
+                <div class="candidate-photo">
+                    {% if candidate.photo %}
+                    <img src="{{ candidate.photo.url }}" alt="{{ candidate.full_name }}">
+                    {% else %}
+                    <div class="photo-placeholder">{{ candidate.full_name|first }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="candidate-info">
+                    <h3 class="candidate-name">{{ candidate.full_name }}</h3>
+                    <span class="candidate-party party-{{ candidate.party }}">
+                        {{ candidate.get_party_display }}
+                    </span>
+                    {% if candidate.bio %}
+                    <p class="candidate-bio">{{ candidate.bio|truncatewords:20 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Per-card Vote Button (appears when card is clicked) -->
+                <div class="card-vote-btn-wrap" id="vote-btn-wrap-{{ candidate.id }}" style="display:none;">
+                    <button
+                        class="btn btn-cast card-vote-btn"
+                        id="vote-btn-{{ candidate.id }}"
+                        onclick="openConfirm({{ candidate.id }}, '{{ candidate.full_name|escapejs }}')"
+                    >
+                        Vote for {{ candidate.full_name }}
+                    </button>
+                    <button class="btn btn-cancel card-cancel-btn" onclick="cancelSelection()">Cancel</button>
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Vote Confirmation Modal -->
+        <div class="vote-confirm-panel" id="vote-confirm" style="display:none">
+            <div class="confirm-inner">
+                <h3 data-en="Confirm Your Vote" data-ar="تأكيد التصويت">Confirm Your Vote</h3>
+                <div class="confirm-selection">
+                    <span class="confirm-label" data-en="You are voting for:" data-ar="أنت تصوت لـ:">You are voting for:</span>
+                    <span class="confirm-name" id="confirm-candidate-name"></span>
+                    <span class="confirm-district">{{ district.name }} <span data-en="District" data-ar="الدائرة">District</span></span>
+                </div>
+                <div class="confirm-warning" data-en="⚠️ This action cannot be undone. Your vote is permanent." data-ar="⚠️ لا يمكن التراجع عن هذا الإجراء. صوتك نهائي.">
+                    ⚠️ This action cannot be undone. Your vote is permanent.
+                </div>
+                <div class="confirm-actions">
+                    <button class="btn btn-cancel" onclick="cancelSelection()" data-en="Cancel" data-ar="إلغاء">Cancel</button>
+                    <button class="btn btn-cast" id="cast-btn" onclick="castVote()">
+                        <span id="cast-btn-text" data-en="Cast Vote ✓" data-ar="أدلِ بصوتك ✓">Cast Vote ✓</span>
+                        <span id="cast-loader" style="display:none" data-en="Submitting…" data-ar="جارٍ الإرسال…">Submitting…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <div class="no-candidates">
+            <p>No candidates found for your district ({{ district.name }}).</p>
+            <p>Please contact the election commission.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% csrf_token %}
+
+<style>
+/* Per-card Vote button area */
+.card-vote-btn-wrap {
+    padding: 0.75rem 1rem 1rem;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.card-vote-btn {
+    flex: 1;
+    font-size: 0.85rem;
+    padding: 0.55rem 1rem;
+}
+.card-cancel-btn {
+    font-size: 0.82rem;
+    padding: 0.5rem 0.9rem;
+}
+
+/* Already-voted banner */
+.voted-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+    border: 1.5px solid #86efac;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+    color: #166534;
+}
+.voted-banner-icon { font-size: 1.5rem; }
+
+/* Disabled card overlay */
+.candidate-card.voting-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+.candidate-card.voted-card {
+    opacity: 1 !important;
+    pointer-events: none;
+    border: 2px solid #16a34a;
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const SECONDS_REMAINING = {{ seconds_remaining|default:0 }};
+let selectedCandidateId = null;
+
+// ── Countdown Timer ──────────────────────────────────────────────────────────
+function updateCountdown() {
+    const el = document.getElementById('countdown');
+    if (!el) return;
+    let remaining = SECONDS_REMAINING - Math.floor((Date.now() / 1000) - window._startTime);
+    if (remaining <= 0) {
+        el.textContent = 'CLOSED';
+        el.style.color = '#ef4444';
+        return;
+    }
+    const h = Math.floor(remaining / 3600);
+    const m = Math.floor((remaining % 3600) / 60);
+    const s = remaining % 60;
+    el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+window._startTime = Date.now() / 1000;
+setInterval(updateCountdown, 1000);
+updateCountdown();
+
+// ── Card Click → Show Vote Button ───────────────────────────────────────────
+document.querySelectorAll('.candidate-card').forEach(card => {
+    card.addEventListener('click', function(e) {
+        // Don't re-trigger if clicking inside the button wrap
+        if (e.target.closest('.card-vote-btn-wrap')) return;
+
+        const id   = this.dataset.id;
+        const name = this.querySelector('.candidate-name').textContent;
+        selectCandidate(id, name);
+    });
+});
+
+function selectCandidate(id, name) {
+    // Deselect all cards
+    document.querySelectorAll('.candidate-card').forEach(c => {
+        c.classList.remove('selected');
+        document.getElementById('vote-btn-wrap-' + c.dataset.id).style.display = 'none';
+    });
+
+    const card = document.getElementById('card-' + id);
+    card.classList.add('selected');
+    selectedCandidateId = id;
+
+    // Show the per-card Vote button
+    document.getElementById('vote-btn-wrap-' + id).style.display = 'flex';
+
+    // Close modal if open
+    document.getElementById('vote-confirm').style.display = 'none';
+}
+
+function cancelSelection() {
+    document.querySelectorAll('.candidate-card').forEach(c => {
+        c.classList.remove('selected');
+        document.getElementById('vote-btn-wrap-' + c.dataset.id).style.display = 'none';
+    });
+    selectedCandidateId = null;
+    document.getElementById('vote-confirm').style.display = 'none';
+}
+
+// ── Open Confirmation Panel ──────────────────────────────────────────────────
+function openConfirm(id, name) {
+    selectedCandidateId = id;
+    document.getElementById('confirm-candidate-name').textContent = name;
+    const panel = document.getElementById('vote-confirm');
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ── Cast Vote ────────────────────────────────────────────────────────────────
+async function castVote() {
+    if (!selectedCandidateId) return;
+
+    const btn = document.getElementById('cast-btn');
+    document.getElementById('cast-btn-text').style.display = 'none';
+    document.getElementById('cast-loader').style.display   = 'inline';
+    btn.disabled = true;
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    try {
+        const res  = await fetch('/api/cast-vote/', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ candidate_id: parseInt(selectedCandidateId) })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            window.location.href = data.redirect;
+        } else if (data.error && data.error.toLowerCase().includes('already')) {
+            // Show inline already-voted state
+            showAlreadyVoted(document.getElementById('confirm-candidate-name').textContent);
+        } else {
+            alert(data.error || 'Error casting vote. Please try again.');
+            btn.disabled = false;
+            document.getElementById('cast-btn-text').style.display = 'inline';
+            document.getElementById('cast-loader').style.display   = 'none';
+        }
+    } catch (e) {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        document.getElementById('cast-btn-text').style.display = 'inline';
+        document.getElementById('cast-loader').style.display   = 'none';
+    }
+}
+
+function showAlreadyVoted(candidateName) {
+    // Hide confirm panel
+    document.getElementById('vote-confirm').style.display = 'none';
+
+    // Show banner
+    const banner = document.getElementById('voted-banner');
+    document.getElementById('voted-banner-candidate').textContent =
+        candidateName ? ' Your vote was recorded for ' + candidateName + '.' : '';
+    banner.style.display = 'flex';
+
+    // Disable all cards
+    document.querySelectorAll('.candidate-card').forEach(c => {
+        c.classList.add('voting-disabled');
+        document.getElementById('vote-btn-wrap-' + c.dataset.id).style.display = 'none';
+    });
+
+    banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+{% endblock %}

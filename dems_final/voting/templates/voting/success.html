@@ -1,0 +1,56 @@
+{% extends 'voting/base.html' %}
+{% block navbar_class %}always-visible{% endblock %}
+{% load static %}
+
+{% block title %}DEMS — Vote Cast Successfully{% endblock %}
+
+{% block content %}
+<div class="result-page success-page">
+    <div class="result-card">
+        <div class="result-animation">
+            <div class="checkmark-circle">
+                <svg class="checkmark" viewBox="0 0 52 52">
+                    <circle class="checkmark-circle-bg" cx="26" cy="26" r="25" fill="none"/>
+                    <path class="checkmark-path" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>
+            </div>
+            <div class="confetti-burst">
+                {% for i in "123456789012" %}
+                <div class="confetti-piece" style="--i:{{ forloop.counter }}"></div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <h1 class="success-title" data-en="Vote Cast!" data-ar="تم التصويت!">Vote Cast!</h1>
+        <p class="success-sub" data-en="Your vote has been recorded securely in the blockchain ledger." data-ar="تم تسجيل صوتك بأمان في سجل البلوك تشين.">Your vote has been recorded securely in the blockchain ledger.</p>
+
+        <div class="vote-receipt">
+            <div class="receipt-header" data-en="Official Vote Receipt" data-ar="إيصال التصويت الرسمي">Official Vote Receipt</div>
+            <div class="receipt-row">
+                <span class="receipt-label" data-en="Voter" data-ar="الناخب">Voter</span>
+                <span class="receipt-value">{{ voter.full_name }}</span>
+            </div>
+            <div class="receipt-row">
+                <span class="receipt-label" data-en="National ID" data-ar="رقم الهوية">National ID</span>
+                <span class="receipt-value">{{ voter.national_id }}</span>
+            </div>
+            <div class="receipt-row">
+                <span class="receipt-label" data-en="You Voted For" data-ar="صوّتَ لـ">You Voted For</span>
+                <span class="receipt-value receipt-highlight">{{ voted_for }}</span>
+            </div>
+            <div class="receipt-row">
+                <span class="receipt-label" data-en="District" data-ar="الدائرة">District</span>
+                <span class="receipt-value">{{ district }}</span>
+            </div>
+            <div class="receipt-footer">
+                Arab Republic of Egypt &bull; DEMS
+            </div>
+        </div>
+
+        <div class="success-actions">
+            <a href="{% url 'results' %}" class="btn btn-results" data-en="View Live Results" data-ar="النتائج المباشرة">View Live Results</a>
+            <a href="{% url 'logout' %}" class="btn btn-ghost" data-en="Logout" data-ar="خروج">Logout</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

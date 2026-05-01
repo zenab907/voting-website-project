@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DEMS - Digital Election Management System{% endblock %}</title>
+    {% load static %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Cairo:wght@300;400;600;700&family=Amiri:ital,wght@0,400;0,700;1,400&family=Amiri+Quran&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'voting/css/main.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+{% block welcome %}{% endblock %}
+
+<!-- 3D Particle Canvas Background -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- Navigation -->
+<nav class="navbar {% block navbar_class %}{% endblock %}" id="navbar">
+    <div class="nav-inner">
+        <a href="{% url 'home' %}" class="nav-logo">
+            <span class="logo-mark">&#9419;</span>
+            <span class="logo-text">DEMS</span>
+        </a>
+        <div class="nav-links">
+            <a href="{% url 'results' %}" class="nav-link" data-en="Results" data-ar="النتائج">Results</a>
+            {% if request.session.voter_id %}
+                <a href="{% url 'vote_success' %}" class="nav-link" data-en="My Vote" data-ar="صوتي">My Vote</a>
+                <a href="{% url 'logout' %}" class="nav-link btn-ghost btn" data-en="Logout" data-ar="تسجيل خروج">Logout</a>
+            {% else %}
+                <a href="{% url 'login' %}" class="nav-link btn-primary btn" data-en="Login to Vote" data-ar="دخول للتصويت">Login to Vote</a>
+            {% endif %}
+
+            <!-- Dark/Light Mode Toggle -->
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode" aria-label="Toggle theme">
+                <div class="theme-toggle-track">
+                    <span class="theme-toggle-icon moon">🌙</span>
+                    <span class="theme-toggle-icon sun">☀️</span>
+                    <div class="theme-toggle-knob"></div>
+                </div>
+            </button>
+
+            <!-- Language Toggle -->
+            <button class="lang-toggle" id="lang-toggle" onclick="toggleLanguage()" title="تغيير اللغة / Change Language">
+                <span class="lang-icon">🌐</span>
+                <span class="lang-label" id="lang-label">AR</span>
+            </button>
+        </div>
+    </div>
+</nav>
+
+{% if messages %}
+<div class="flash-container">
+    {% for message in messages %}
+    <div class="flash flash-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<main class="main-content">
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+    <span class="footer-seal">&#127963;</span>
+    <p data-en="DEMS — Digital Election Management System — Arab Republic of Egypt"
+       data-ar="DEMS — نظام إدارة الانتخابات الرقمية — جمهورية مصر العربية">
+       DEMS &mdash; Digital Election Management System &mdash; Arab Republic of Egypt
+    </p>
+    <p class="footer-sub"
+       data-en="Secured by National ID Verification · Encrypted End-to-End"
+       data-ar="مؤمن بالتحقق من الهوية الوطنية · مشفر بالكامل">
+       Secured by National ID Verification &middot; Encrypted End-to-End
+    </p>
+</footer>
+
+<!-- ═══════════════════════════════════════════════
+     CHATBOT WIDGET
+═══════════════════════════════════════════════ -->
+<div id="chatbot-bubble" onclick="toggleChat()" title="Election Assistant">
+    <span class="chat-bubble-icon" id="chat-bubble-icon">💬</span>
+    <span class="chat-unread" id="chat-unread">1</span>
+</div>
+
+<div id="chatbot-window" class="chatbot-hidden">
+    <div class="chat-header">
+        <div class="chat-header-left">
+            <div class="chat-avatar">🗳️</div>
+            <div>
+                <div class="chat-title" id="chat-title">Election Assistant</div>
+                <div class="chat-status" id="chat-status">&#9679; Online</div>
+            </div>
+        </div>
+        <button class="chat-close" onclick="toggleChat()">&#10005;</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+        <div class="chat-msg bot">
+            <div class="chat-msg-bubble" id="welcome-msg">
+                &#128075; Welcome! I'm the DEMS Election Assistant.<br>
+                Ask me anything about the Egyptian elections!
+            </div>
+        </div>
+    </div>
+    <div class="chat-quick-btns" id="quick-btns">
+        <button onclick="sendQuick(this)" data-en="How to vote?" data-ar="كيف أصوت؟">How to vote?</button>
+        <button onclick="sendQuick(this)" data-en="Election date?" data-ar="موعد الانتخابات؟">Election date?</button>
+        <button onclick="sendQuick(this)" data-en="Who can vote?" data-ar="من يحق له التصويت؟">Who can vote?</button>
+        <button onclick="sendQuick(this)" data-en="Is my vote secret?" data-ar="هل صوتي سري؟">Is my vote secret?</button>
+    </div>
+    <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Type your question..." onkeydown="if(event.key==='Enter')sendMessage()">
+        <button onclick="sendMessage()" class="chat-send">&#10148;</button>
+    </div>
+</div>
+
+<script src="{% static 'voting/js/main.js' %}"></script>
+<script src="{% static 'voting/js/chatbot.js' %}"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   BACKGROUND CANVAS & PARTICLES
+═══════════════════════════════════════════════════════════ */
+(function(){
+    const canvas=document.getElementById('bg-canvas');
+    if(!canvas)return;
+    const ctx=canvas.getContext('2d');
+    let W,H,nodes=[];
+    function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+    resize();window.addEventListener('resize',resize);
+    class Node{constructor(){this.reset();}reset(){this.x=Math.random()*W;this.y=Math.random()*H;this.z=Math.random()*2+0.5;this.vx=(Math.random()-.5)*.35;this.vy=(Math.random()-.5)*.35;this.r=Math.random()*1.5+.4;this.opacity=Math.random()*.35+.08;}update(){this.x+=this.vx*this.z;this.y+=this.vy*this.z;if(this.x<0||this.x>W)this.vx*=-1;if(this.y<0||this.y>H)this.vy*=-1;}}
+    for(let i=0;i<70;i++)nodes.push(new Node());
+    let mouse={x:W/2,y:H/2};
+    window.addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY;});
+    function getNodeColor(){
+        if(document.body.classList.contains('light-mode'))return'rgba(26,86,160,';
+        return'rgba(201,146,42,';
+    }
+    function draw(){
+        ctx.clearRect(0,0,W,H);
+        const col=getNodeColor();
+        ctx.strokeStyle=col+'0.03)';ctx.lineWidth=0.5;
+        const g=80;
+        for(let x=0;x<W;x+=g){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+        for(let y=0;y<H;y+=g){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+        for(let i=0;i<nodes.length;i++){
+            for(let j=i+1;j<nodes.length;j++){
+                const dx=nodes[i].x-nodes[j].x,dy=nodes[i].y-nodes[j].y,d=Math.sqrt(dx*dx+dy*dy);
+                if(d<120){ctx.strokeStyle=col+(1-d/120)*.12+')';ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(nodes[i].x,nodes[i].y);ctx.lineTo(nodes[j].x,nodes[j].y);ctx.stroke();}
+            }
+            nodes[i].update();
+            ctx.beginPath();ctx.arc(nodes[i].x,nodes[i].y,nodes[i].r,0,Math.PI*2);ctx.fillStyle=col+nodes[i].opacity+')';ctx.fill();
+        }
+        const grd=ctx.createRadialGradient(mouse.x,mouse.y,0,mouse.x,mouse.y,180);
+        grd.addColorStop(0,col+'0.05)');grd.addColorStop(1,col+'0)');
+        ctx.fillStyle=grd;ctx.fillRect(0,0,W,H);
+        requestAnimationFrame(draw);
+    }
+    draw();
+    for(let i=0;i<14;i++){const p=document.createElement('div');p.className='particle';const s=Math.random()*2.5+.5;p.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;--dur:${8+Math.random()*12}s;animation-delay:${Math.random()*12}s`;document.body.appendChild(p);}
+})();
+(function(){
+    const els=document.querySelectorAll('.reveal');
+    const obs=new IntersectionObserver(e=>{e.forEach(el=>{if(el.isIntersecting){el.target.classList.add('revealed');obs.unobserve(el.target);}});},{threshold:.1});
+    els.forEach(el=>obs.observe(el));
+})();
+document.querySelectorAll('.feat-card,.step,.admin-stat-card,.admin-link-card').forEach(c=>{
+    c.addEventListener('mousemove',e=>{const r=c.getBoundingClientRect();const dx=(e.clientX-r.left-r.width/2)/(r.width/2);const dy=(e.clientY-r.top-r.height/2)/(r.height/2);c.style.transform=`translateY(-8px) rotateX(${-dy*7}deg) rotateY(${dx*7}deg) scale(1.02)`;});
+    c.addEventListener('mouseleave',()=>{c.style.transform='';});
+});
+</script>
+
+{% block extra_js %}{% endblock %}
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   THEME TOGGLE (Dark / Light Mode)
+═══════════════════════════════════════════════════════════ */
+var currentTheme = localStorage.getItem('demsTheme') || 'dark';
+
+function applyTheme(theme) {
+    if (theme === 'light') {
+        document.body.classList.add('light-mode');
+    } else {
+        document.body.classList.remove('light-mode');
+    }
+    localStorage.setItem('demsTheme', theme);
+    currentTheme = theme;
+}
+
+function toggleTheme() {
+    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+}
+
+/* Apply theme immediately on load */
+applyTheme(currentTheme);
+
+/* ═══════════════════════════════════════════════════════════
+   LANGUAGE TOGGLE — Full Page Translation
+═══════════════════════════════════════════════════════════ */
+var currentLang = localStorage.getItem('demsLang') || 'en';
+
+/* ── Translation dictionary ── */
+var translations = {
+  en: {
+    /* Chatbot */
+    'chat-title': 'Election Assistant',
+    'chat-status': '&#9679; Online',
+    'welcome-msg': '&#128075; Welcome! I\'m the DEMS Election Assistant.<br>Ask me anything about the Egyptian elections!',
+    'chat-placeholder': 'Type your question...',
+    /* Nav */
+    'nav-results': 'Results',
+    'nav-myvote': 'My Vote',
+    'nav-logout': 'Logout',
+    'nav-login': 'Login to Vote',
+    'lang-label': 'AR',
+    /* Home hero */
+    'hero-badge': 'Arab Republic of Egypt · Elections',
+    'hero-title-line1': 'Your Vote',
+    'hero-title-accent': 'Your Future',
+    'hero-sub': 'The official Egyptian digital election platform. Securely authenticate with your National ID and cast your vote from anywhere in Egypt.',
+    'hero-btn-vote': '🗳 Login & Vote',
+    'hero-btn-results': '📊 View Live Results',
+    'card-secure-title': 'Secure Auth',
+    'card-secure-desc': 'National ID verification',
+    'card-live-title': 'Live Results',
+    'card-live-desc': 'Real-time counting',
+    'card-one-title': 'One Vote',
+    'card-one-desc': 'System enforced',
+    /* How to vote */
+    'how-title': 'How to Vote',
+    'step1-title': 'Enter National ID',
+    'step1-desc': 'Provide your 14-digit Egyptian National ID number',
+    'step2-title': 'Verify Identity',
+    'step2-desc': 'The system checks your registration in the national database',
+    'step3-title': 'Face Biometric',
+    'step3-desc': 'Confirm your identity with a live face scan via your camera',
+    'step4-title': 'Select Candidate',
+    'step4-desc': 'Choose your preferred candidate from your district\'s list',
+    'step5-title': 'Cast Your Vote',
+    'step5-desc': 'Confirm your selection to finalize your vote securely',
+    /* Welcome overlay */
+    'welcome-tagline': 'Digital Election Management System · جمهورية مصر العربية',
+    'welcome-greeting': 'أهلاً وسهلاً بك 🏛',
+    'welcome-desc': 'مرحباً بك في نظام الانتخابات الرقمي المصري. هنا يمكنك الإدلاء بصوتك بكل أمان وسرية. صوتك يصنع المستقبل.',
+    'welcome-btn': 'Enter the System Ⓣ',
+    /* Election status */
+    'status-open-label': 'Election is OPEN',
+    'status-closed-label': 'Election is CLOSED',
+    /* Footer */
+    'footer-main': 'DEMS — Digital Election Management System — Arab Republic of Egypt',
+    'footer-sub': 'Secured by National ID Verification · Encrypted End-to-End',
+    /* ── Vote page ── */
+    'voter-verified': '✓ Authenticated',
+    'district-label': 'Your District',
+    'timer-label': 'Election closes in',
+    'vote-h1': 'Select Your Candidate',
+    'confirm-h3': 'Confirm Your Vote',
+    'confirm-label': 'You are voting for:',
+    'confirm-warning': '⚠️ This action cannot be undone. Your vote is permanent.',
+    'btn-cancel': 'Cancel',
+    'btn-cast': 'Cast Vote ✓',
+    'btn-submitting': 'Submitting…',
+    /* ── Results page ── */
+    'results-h1': 'Live Election Results',
+    'meta-label-votes': 'Total Votes Cast',
+    'meta-label-turnout': 'Voter Turnout',
+    /* ── Success page ── */
+    'success-h1': 'Vote Cast!',
+    'success-sub': 'Your vote has been recorded securely in the blockchain ledger.',
+    'receipt-header-text': 'Official Vote Receipt',
+    'receipt-voter': 'Voter',
+    'receipt-national-id': 'National ID',
+    'receipt-voted-for': 'You Voted For',
+    'receipt-district': 'District',
+    'btn-view-results': 'View Live Results',
+    'btn-logout': 'Logout',
+    /* ── Already voted ── */
+    'already-h1': 'You Have Already Voted',
+    'already-sub': 'Each registered voter may only vote once. Your vote is permanent and secure.',
+    /* ── Election closed ── */
+    'closed-h1': 'Election Is Not Open',
+    'btn-view-results-closed': 'View Results',
+    'btn-home': 'Home',
+    /* ── Login page ── */
+    'login-h1': 'Voter Login',
+    'login-sub': 'Enter your National ID to access the voting system',
+    'label-national-id': 'National ID',
+    'placeholder-national-id': 'Enter your 14-digit National ID',
+    'hint-national-id': '14-digit Egyptian National ID',
+    'face-section-title': 'Face Biometric Verification',
+    'face-section-subtitle-first': 'First time? Your face will be saved as your biometric identity.',
+    'face-section-subtitle-return': 'Returning? Your face will be compared to the saved record.',
+    'btn-start-camera': '📷 Start Camera',
+    'btn-capture-face': '📸 Capture Face',
+    'btn-cancel-camera': '✕ Cancel',
+    'btn-retake': '🔄 Retake Photo',
+    'btn-verify-identity': 'Verify Identity →',
+    'btn-checking': 'Checking…',
+    'voted-banner-already': 'You have already voted.',
+  },
+  ar: {
+    /* Chatbot */
+    'chat-title': 'مساعد الانتخابات',
+    'chat-status': '&#9679; متصل',
+    'welcome-msg': '&#128075; أهلاً! أنا مساعد DEMS للانتخابات.<br>اسألني أي شيء عن الانتخابات المصرية!',
+    'chat-placeholder': 'اكتب سؤالك...',
+    /* Nav */
+    'nav-results': 'النتائج',
+    'nav-myvote': 'صوتي',
+    'nav-logout': 'خروج',
+    'nav-login': 'دخول للتصويت',
+    'lang-label': 'EN',
+    /* Home hero */
+    'hero-badge': 'جمهورية مصر العربية · الانتخابات',
+    'hero-title-line1': 'صوتك',
+    'hero-title-accent': 'مستقبلك',
+    'hero-sub': 'المنصة الرسمية للتصويت الرقمي في مصر. سجّل دخولك بهويتك الوطنية بأمان وأدلِ بصوتك من أي مكان في مصر.',
+    'hero-btn-vote': '🗳 دخول للتصويت',
+    'hero-btn-results': '📊 النتائج المباشرة',
+    'card-secure-title': 'تحقق آمن',
+    'card-secure-desc': 'التحقق بالهوية الوطنية',
+    'card-live-title': 'نتائج فورية',
+    'card-live-desc': 'فرز في الوقت الفعلي',
+    'card-one-title': 'صوت واحد',
+    'card-one-desc': 'مُطبَّق بواسطة النظام',
+    /* How to vote */
+    'how-title': 'كيفية التصويت',
+    'step1-title': 'أدخل رقم الهوية',
+    'step1-desc': 'أدخل رقم هويتك الوطنية المكون من 14 رقماً',
+    'step2-title': 'تحقق من الهوية',
+    'step2-desc': 'يتحقق النظام من تسجيلك في قاعدة البيانات الوطنية',
+    'step3-title': 'بصمة الوجه',
+    'step3-desc': 'أكد هويتك بمسح وجهك مباشرةً عبر الكاميرا',
+    'step4-title': 'اختر المرشح',
+    'step4-desc': 'اختر مرشحك المفضل من قائمة دائرتك الانتخابية',
+    'step5-title': 'أدلِ بصوتك',
+    'step5-desc': 'أكد اختيارك لإتمام التصويت بأمان',
+    /* Welcome overlay */
+    'welcome-tagline': 'نظام إدارة الانتخابات الرقمية · جمهورية مصر العربية',
+    'welcome-greeting': 'أهلاً وسهلاً بك 🏛',
+    'welcome-desc': 'مرحباً بك في نظام الانتخابات الرقمي المصري. هنا يمكنك الإدلاء بصوتك بكل أمان وسرية. صوتك يصنع المستقبل.',
+    'welcome-btn': 'ادخل النظام Ⓣ',
+    /* Election status */
+    'status-open-label': 'الانتخابات مفتوحة',
+    'status-closed-label': 'الانتخابات مغلقة',
+    /* Footer */
+    'footer-main': 'DEMS — نظام إدارة الانتخابات الرقمية — جمهورية مصر العربية',
+    'footer-sub': 'مؤمن بالتحقق من الهوية الوطنية · مشفر بالكامل',
+    /* ── Vote page ── */
+    'voter-verified': '✓ تم التحقق',
+    'district-label': 'دائرتك الانتخابية',
+    'timer-label': 'ينتهي التصويت خلال',
+    'vote-h1': 'اختر مرشحك',
+    'confirm-h3': 'تأكيد التصويت',
+    'confirm-label': 'أنت تصوت لـ:',
+    'confirm-warning': '⚠️ لا يمكن التراجع عن هذا الإجراء. صوتك نهائي.',
+    'btn-cancel': 'إلغاء',
+    'btn-cast': 'أدلِ بصوتك ✓',
+    'btn-submitting': 'جارٍ الإرسال…',
+    /* ── Results page ── */
+    'results-h1': 'نتائج الانتخابات المباشرة',
+    'meta-label-votes': 'إجمالي الأصوات',
+    'meta-label-turnout': 'نسبة المشاركة',
+    /* ── Success page ── */
+    'success-h1': 'تم التصويت!',
+    'success-sub': 'تم تسجيل صوتك بأمان في سجل البلوك تشين.',
+    'receipt-header-text': 'إيصال التصويت الرسمي',
+    'receipt-voter': 'الناخب',
+    'receipt-national-id': 'رقم الهوية',
+    'receipt-voted-for': 'صوّتَ لـ',
+    'receipt-district': 'الدائرة',
+    'btn-view-results': 'النتائج المباشرة',
+    'btn-logout': 'خروج',
+    /* ── Already voted ── */
+    'already-h1': 'لقد صوّتَ مسبقاً',
+    'already-sub': 'يحق لكل ناخب مسجّل التصويت مرة واحدة فقط. صوتك دائم وآمن.',
+    /* ── Election closed ── */
+    'closed-h1': 'الانتخابات غير مفتوحة',
+    'btn-view-results-closed': 'عرض النتائج',
+    'btn-home': 'الرئيسية',
+    /* ── Login page ── */
+    'login-h1': 'دخول الناخب',
+    'login-sub': 'أدخل رقم هويتك الوطنية للوصول إلى نظام التصويت',
+    'label-national-id': 'رقم الهوية الوطنية',
+    'placeholder-national-id': 'أدخل رقم الهوية المكوّن من 14 رقماً',
+    'hint-national-id': 'رقم الهوية الوطنية المصرية (14 رقماً)',
+    'face-section-title': 'التحقق بالوجه البيومتري',
+    'face-section-subtitle-first': 'لأول مرة؟ سيتم حفظ وجهك كهويتك البيومترية.',
+    'face-section-subtitle-return': 'عائد؟ سيتم مقارنة وجهك بالسجل المحفوظ.',
+    'btn-start-camera': '📷 تشغيل الكاميرا',
+    'btn-capture-face': '📸 التقاط الوجه',
+    'btn-cancel-camera': '✕ إلغاء',
+    'btn-retake': '🔄 إعادة الالتقاط',
+    'btn-verify-identity': 'تحقق من الهوية →',
+    'btn-checking': 'جارٍ التحقق…',
+    'voted-banner-already': 'لقد أدليتَ بصوتك مسبقاً.',
+  }
+};
+
+function applyLanguage(lang) {
+    var t = translations[lang];
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+
+    /* Lang button label */
+    var lbl = document.getElementById('lang-label');
+    if (lbl) lbl.textContent = t['lang-label'];
+
+    /* Chatbot strings */
+    var chatTitle = document.getElementById('chat-title');
+    if (chatTitle) chatTitle.innerHTML = t['chat-title'];
+    var chatStatus = document.getElementById('chat-status');
+    if (chatStatus) chatStatus.innerHTML = t['chat-status'];
+    var welcomeMsg = document.getElementById('welcome-msg');
+    if (welcomeMsg) welcomeMsg.innerHTML = t['welcome-msg'];
+    var chatInput = document.getElementById('chat-input');
+    if (chatInput) chatInput.placeholder = t['chat-placeholder'];
+
+    /* Nav links and all elements with data-en/data-ar */
+    document.querySelectorAll('[data-en][data-ar]').forEach(function(el) {
+        var val = lang === 'ar' ? el.getAttribute('data-ar') : el.getAttribute('data-en');
+        if (!val) return;
+        if (el.tagName === 'INPUT') {
+            /* For inputs, update placeholder */
+            el.placeholder = val;
+        } else {
+            el.textContent = val;
+        }
+    });
+
+    /* Quick chat buttons */
+    document.querySelectorAll('.chat-quick-btns button').forEach(function(btn) {
+        var val = lang === 'ar' ? btn.getAttribute('data-ar') : btn.getAttribute('data-en');
+        if (val) btn.textContent = val;
+    });
+
+    /* ── HOME PAGE SPECIFIC TRANSLATIONS ── */
+
+    /* Hero badge */
+    var heroBadge = document.querySelector('.hero-badge');
+    if (heroBadge) {
+        var badgeDot = heroBadge.querySelector('::before') || null;
+        heroBadge.childNodes.forEach(function(n) {
+            if (n.nodeType === 3) n.textContent = t['hero-badge'];
+        });
+        // Safer approach: set innerHTML keeping the dot pseudoelement
+        var dotSpan = heroBadge.querySelector('.badge-dot');
+        if (dotSpan) {
+            heroBadge.innerHTML = '';
+            heroBadge.appendChild(dotSpan);
+            heroBadge.appendChild(document.createTextNode(' ' + t['hero-badge']));
+        } else {
+            heroBadge.textContent = t['hero-badge'];
+        }
+    }
+
+    /* Hero title */
+    var heroTitleLines = document.querySelectorAll('.hero-title');
+    heroTitleLines.forEach(function(ht) {
+        var accent = ht.querySelector('.hero-accent');
+        var line1 = ht.querySelector('.hero-title-line1');
+        if (accent) accent.textContent = t['hero-title-accent'];
+        if (line1) line1.textContent = t['hero-title-line1'];
+    });
+
+    /* Hero subtitle */
+    var heroSub = document.querySelector('.hero-sub');
+    if (heroSub) heroSub.textContent = t['hero-sub'];
+
+    /* Hero action buttons */
+    var btnVote = document.querySelector('.btn-vote');
+    if (btnVote) btnVote.innerHTML = t['hero-btn-vote'];
+    var btnResults = document.querySelector('.btn-results');
+    if (btnResults) btnResults.innerHTML = t['hero-btn-results'];
+
+    /* 3D card labels */
+    var orbitingCards = document.querySelectorAll('.orbiting-card');
+    var cardKeys = [
+        {title:'card-secure-title', desc:'card-secure-desc'},
+        {title:'card-live-title', desc:'card-live-desc'},
+        {title:'card-one-title', desc:'card-one-desc'}
+    ];
+    orbitingCards.forEach(function(card, i) {
+        if (cardKeys[i]) {
+            var titleEl = card.querySelector('.card-title');
+            var descEl = card.querySelector('.card-desc');
+            if (titleEl) titleEl.textContent = t[cardKeys[i].title];
+            if (descEl) descEl.textContent = t[cardKeys[i].desc];
+        }
+    });
+
+    /* How to vote section */
+    var sectionTitle = document.querySelector('.section-title');
+    if (sectionTitle) sectionTitle.textContent = t['how-title'];
+    var steps = document.querySelectorAll('.step');
+    var stepKeys = [
+        {title:'step1-title', desc:'step1-desc'},
+        {title:'step2-title', desc:'step2-desc'},
+        {title:'step3-title', desc:'step3-desc'},
+        {title:'step4-title', desc:'step4-desc'},
+        {title:'step5-title', desc:'step5-desc'}
+    ];
+    steps.forEach(function(step, i) {
+        if (stepKeys[i]) {
+            var h3 = step.querySelector('h3');
+            var p = step.querySelector('p');
+            if (h3) h3.textContent = t[stepKeys[i].title];
+            if (p) p.textContent = t[stepKeys[i].desc];
+        }
+    });
+
+    /* Welcome overlay */
+    var welcomeTagline = document.querySelector('.welcome-tagline');
+    if (welcomeTagline) welcomeTagline.textContent = t['welcome-tagline'];
+    var welcomeBtn = document.querySelector('.welcome-enter-btn');
+    if (welcomeBtn) welcomeBtn.textContent = t['welcome-btn'];
+    var welcomeDesc = document.querySelector('.welcome-message p');
+    if (welcomeDesc) welcomeDesc.textContent = t['welcome-desc'];
+
+    /* Election status */
+    var statusEl = document.querySelector('.election-status');
+    if (statusEl) {
+        var statusDot = statusEl.querySelector('.status-dot');
+        var isOpen = statusEl.classList.contains('status-open');
+        var strongEl = statusEl.querySelector('strong');
+        if (strongEl) {
+            strongEl.textContent = isOpen ? t['status-open-label'] : t['status-closed-label'];
+        }
+    }
+
+    /* Footer */
+    var footerMain = document.querySelector('.footer > p:not(.footer-sub)');
+    if (footerMain) footerMain.textContent = t['footer-main'];
+    var footerSub = document.querySelector('.footer-sub');
+    if (footerSub) footerSub.textContent = t['footer-sub'];
+
+    /* Page title */
+    if (lang === 'ar') {
+        document.title = 'DEMS — نظام إدارة الانتخابات الرقمية';
+    } else {
+        document.title = 'DEMS — Egyptian Digital Election System';
+    }
+
+    /* ── VOTE PAGE ── */
+    var voterVerified = document.querySelector('.voter-verified');
+    if (voterVerified) voterVerified.textContent = t['voter-verified'];
+    var districtLabel = document.querySelector('.district-label');
+    if (districtLabel) districtLabel.textContent = t['district-label'];
+    var timerLabel = document.querySelector('.timer-label');
+    if (timerLabel) timerLabel.textContent = t['timer-label'];
+    var voteH1 = document.querySelector('.vote-header h1');
+    if (voteH1) voteH1.textContent = t['vote-h1'];
+    var confirmH3 = document.querySelector('.confirm-inner h3');
+    if (confirmH3) confirmH3.textContent = t['confirm-h3'];
+    var confirmLabelEl = document.querySelector('.confirm-label');
+    if (confirmLabelEl) confirmLabelEl.textContent = t['confirm-label'];
+    var confirmWarning = document.querySelector('.confirm-warning');
+    if (confirmWarning) confirmWarning.textContent = t['confirm-warning'];
+    var votedBannerText = document.querySelector('#voted-banner > div > strong');
+    if (votedBannerText) votedBannerText.textContent = t['voted-banner-already'];
+    /* Vote page buttons */
+    document.querySelectorAll('.btn-cancel').forEach(function(el) {
+        if (el.tagName === 'BUTTON') el.textContent = t['btn-cancel'];
+    });
+    var castBtnText = document.getElementById('cast-btn-text');
+    if (castBtnText) castBtnText.textContent = t['btn-cast'];
+    var castLoader = document.getElementById('cast-loader');
+    if (castLoader) castLoader.textContent = t['btn-submitting'];
+
+    /* ── RESULTS PAGE ── */
+    var resultsH1 = document.querySelector('.results-header h1');
+    if (resultsH1) resultsH1.textContent = t['results-h1'];
+    var metaLabels = document.querySelectorAll('.meta-label');
+    if (metaLabels[0]) metaLabels[0].textContent = t['meta-label-votes'];
+    if (metaLabels[1]) metaLabels[1].textContent = t['meta-label-turnout'];
+
+    /* ── SUCCESS PAGE ── */
+    var successTitle = document.querySelector('.success-title');
+    if (successTitle) successTitle.textContent = t['success-h1'];
+    var successSub = document.querySelector('.success-sub');
+    if (successSub) successSub.textContent = t['success-sub'];
+    var receiptHeader = document.querySelector('.receipt-header');
+    if (receiptHeader) receiptHeader.textContent = t['receipt-header-text'];
+    var receiptLabels = document.querySelectorAll('.receipt-label');
+    var receiptKeys = ['receipt-voter', 'receipt-national-id', 'receipt-voted-for', 'receipt-district'];
+    receiptLabels.forEach(function(el, i) { if (receiptKeys[i]) el.textContent = t[receiptKeys[i]]; });
+    /* Success action buttons */
+    var btnViewResults = document.querySelector('.success-actions .btn-results');
+    if (btnViewResults) btnViewResults.textContent = t['btn-view-results'];
+    var btnLogout = document.querySelector('.success-actions .btn-ghost');
+    if (btnLogout) btnLogout.textContent = t['btn-logout'];
+
+    /* ── ALREADY VOTED PAGE ── */
+    var alreadyH1 = document.querySelector('.result-card h1');
+    if (alreadyH1 && document.querySelector('.already-icon')) alreadyH1.textContent = t['already-h1'];
+    var alreadySub = document.querySelector('.already-sub');
+    if (alreadySub) alreadySub.textContent = t['already-sub'];
+
+    /* ── ELECTION CLOSED PAGE ── */
+    var closedH1 = document.querySelector('.result-card h1');
+    if (closedH1 && document.querySelector('.closed-icon')) closedH1.textContent = t['closed-h1'];
+    var btnHome = document.querySelector('.success-actions .btn-ghost[href*="home"]');
+    if (btnHome) btnHome.textContent = t['btn-home'];
+    var btnViewResultsClosed = document.querySelector('.success-actions .btn-results');
+    if (btnViewResultsClosed && document.querySelector('.closed-icon')) btnViewResultsClosed.textContent = t['btn-view-results-closed'];
+
+    /* ── LOGIN PAGE ── */
+    var authH1 = document.querySelector('.auth-header h1');
+    if (authH1) authH1.textContent = t['login-h1'];
+    var authSub = document.querySelector('.auth-header p');
+    if (authSub) authSub.textContent = t['login-sub'];
+    var nidLabel = document.querySelector('label[for="national-id-input"]');
+    if (nidLabel) nidLabel.textContent = t['label-national-id'];
+    var nidInput = document.getElementById('national-id-input');
+    if (nidInput) nidInput.placeholder = t['placeholder-national-id'];
+    var nidHint = document.querySelector('.input-hint');
+    if (nidHint) nidHint.textContent = t['hint-national-id'];
+    var faceSectionTitle = document.querySelector('.face-section-title');
+    if (faceSectionTitle) faceSectionTitle.textContent = t['face-section-title'];
+    var startCameraBtn = document.getElementById('start-camera-btn');
+    if (startCameraBtn) startCameraBtn.textContent = t['btn-start-camera'];
+    var captureBtn = document.getElementById('capture-btn');
+    if (captureBtn) captureBtn.textContent = t['btn-capture-face'];
+    var lookupText = document.getElementById('lookup-text');
+    if (lookupText) lookupText.textContent = t['btn-verify-identity'];
+    var lookupSpinner = document.getElementById('lookup-spinner');
+    if (lookupSpinner) lookupSpinner.textContent = t['btn-checking'];
+
+    localStorage.setItem('demsLang', lang);
+}
+
+function toggleLanguage() {
+    currentLang = currentLang === 'en' ? 'ar' : 'en';
+    applyLanguage(currentLang);
+}
+
+/* Apply language on load */
+applyLanguage(currentLang);
+
+/* ═══════════════════════════════════════════════════════════
+   CHATBOT ENGINE
+═══════════════════════════════════════════════════════════ */
+
+</script>
+</body>
+</html>
