@@ -1,3 +1,0 @@
-@echo off
-echo Starting DEMS...
-python manage.py runserver
