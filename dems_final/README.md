@@ -1,4 +1,4 @@
-# 🗳️ FEMS — Face Election Management System
+# 🗳️ DEMS — Digital Election Management System
 
 **A production-ready Egyptian election platform secured by AI Face Biometrics.**
 
